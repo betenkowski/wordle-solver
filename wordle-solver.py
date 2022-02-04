@@ -70,12 +70,13 @@ def report_for_feedback(word, feedback):
 
 def propose(words, knowledge):
     possible = list(filter(lambda w: is_possible(knowledge, w), words))
-    print(f'{len(possible)} possible words found')
+    pos_count = len(possible)
+    print(f'{pos_count} possible words found')
     max_possible = 100
     solution_found_on = 5
-    if len(possible) < solution_found_on:
+    if pos_count < solution_found_on:
         print(f"Solutions found: {possible}")
-    if len(possible) > max_possible:
+    if pos_count > max_possible:
         print(f'Sampling {max_possible} words')
         possible = random.sample(possible, max_possible)
     score = inf
@@ -86,6 +87,8 @@ def propose(words, knowledge):
             knowledge.append(report_for_words(word, solution))
             candidate_score += sum(1 for w in possible if is_possible(knowledge, w))
             knowledge.pop()
+        if word in possible:
+            candidate_score *= 1.2  # a slight preference of possible words
         if candidate_score < score:
             prop = word
             score = candidate_score
