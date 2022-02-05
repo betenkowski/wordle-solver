@@ -10,33 +10,44 @@ class Report:
     exact: dict
     present_not_on: dict
 
+    def __post_init__(self):
+        self.cache = {}
+
 
 def is_possible_single(report, word):
-    for ch, positions in report.absent.items():
-        e = report.exact.get(ch, set())
-        p = report.present_not_on.get(ch, set())
-        if not e and not p:
-            if ch in word:
-                return False
-        else:
-            if word.count(ch) != len(e) + len(p):
-                return False
-            if any(word[i] == ch for i in positions):
+    if word in report.cache:
+        return report.cache[word]
+
+    def impl():
+        for ch, positions in report.absent.items():
+            e = report.exact.get(ch, set())
+            p = report.present_not_on.get(ch, set())
+            if not e and not p:
+                if ch in word:
+                    return False
+            else:
+                if word.count(ch) != len(e) + len(p):
+                    return False
+                if any(word[i] == ch for i in positions):
+                    return False
+
+        for ch, positions in report.exact.items():
+            if any(word[pos] != ch for pos in positions):
                 return False
 
-    for ch, positions in report.exact.items():
-        if any(word[pos] != ch for pos in positions):
-            return False
+        for ch, positions in report.present_not_on.items():
+            found = False
+            for i, wch in enumerate(word):
+                if wch == ch and i not in positions:
+                    found = True
+            if not found:
+                return False
 
-    for ch, positions in report.present_not_on.items():
-        found = False
-        for i, wch in enumerate(word):
-            if wch == ch and i not in positions:
-                found = True
-        if not found:
-            return False
+        return True
 
-    return True
+    ret = impl()
+    report.cache[word] = ret
+    return ret
 
 
 def is_possible(kb, word):
@@ -100,7 +111,7 @@ def propose(words, knowledge):
     print(f'{pos_count} possible words found')
 
     max_possible = 75
-    max_complexity = 16875000
+    max_complexity = 16875000 * 2
     effective_pos = min(pos_count, max_possible)
 
     if len(words) * pos_count * pos_count > max_complexity:
