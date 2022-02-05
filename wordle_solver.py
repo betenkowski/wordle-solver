@@ -6,27 +6,43 @@ import random
 
 @dataclass
 class Report:
-    absent: set
+    absent: dict
     exact: dict
     present_not_on: dict
 
 
-def is_possible(kb, word):
-    for report in kb:
-        if any(ch in report.absent for ch in word):
+def is_possible_single(report, word):
+    for ch, positions in report.absent.items():
+        e = report.exact.get(ch, set())
+        p = report.present_not_on.get(ch, set())
+        if not e and not p:
+            if ch in word:
+                return False
+        else:
+            if word.count(ch) != len(e) + len(p):
+                return False
+            if any(word[i] == ch for i in positions):
+                return False
+
+    for ch, positions in report.exact.items():
+        if any(word[pos] != ch for pos in positions):
             return False
 
-        for ch, positions in report.exact.items():
-            if any(word[pos] != ch for pos in positions):
-                return False
+    for ch, positions in report.present_not_on.items():
+        found = False
+        for i, wch in enumerate(word):
+            if wch == ch and i not in positions:
+                found = True
+        if not found:
+            return False
 
-        for ch, positions in report.present_not_on.items():
-            found = False
-            for i, wch in enumerate(word):
-                if wch == ch and i not in positions:
-                    found = True
-            if not found:
-                return False
+    return True
+
+
+def is_possible(kb, word):
+    for report in kb:
+        if not is_possible_single(report, word):
+            return False
     return True
 
 
@@ -35,35 +51,45 @@ def add_to_set(d, key, value):
     values.add(value)
 
 
+def add_one(d, key):
+    value = d.setdefault(key, 0)
+    d[key] = value + 1
+
+
 def report_for_words(word, solution):
-    absent = set(w for w in word if w not in solution)
+    absent = {}
     exact = {}
     present_not_on = {}
+    analyzed = {}
     for i, (wch, sch) in enumerate(zip(word, solution)):
         if wch == sch:
             add_to_set(exact, wch, i)
+            add_one(analyzed, wch)
 
-    for i, wch in enumerate(word):
-        if wch in solution and i not in exact.get(wch, set()):
-            add_to_set(present_not_on, wch, i)
+    for i, (wch, sch) in enumerate(zip(word, solution)):
+        if wch != sch:
+            if wch in solution \
+                    and i not in exact.get(wch, set()) \
+                    and analyzed.get(wch, 0) < solution.count(wch):
+                add_to_set(present_not_on, wch, i)
+                add_one(analyzed, wch)
+            else:
+                add_to_set(absent, wch, i)
 
     return Report(absent, exact, present_not_on)
 
 
 def report_for_feedback(word, feedback):
-    absent = set()
+    absent = {}
     exact = {}
     present_not_on = {}
     for i, (wch, fch) in enumerate(zip(word, feedback)):
         if fch == '.':
-            absent.add(wch)
+            add_to_set(absent, wch, i)
         elif fch == '!':
             add_to_set(exact, wch, i)
         elif fch == '?':
             add_to_set(present_not_on, wch, i)
-
-    for ch, s in present_not_on.items():
-        s.update(exact.get(ch, set()))
 
     return Report(absent, exact, present_not_on)
 
