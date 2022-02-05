@@ -120,12 +120,13 @@ def propose(words, knowledge):
     prop = ''
     for word in candidates:
         candidate_score = 0
+        norm = 1.2 if is_possible(knowledge, word) else 1  # a slight preference of possible words
         for solution in possible:
             knowledge.append(report_for_words(word, solution))
-            candidate_score += sum(1 for w in possible if is_possible(knowledge, w))
+            candidate_score += sum(1 for w in possible if is_possible(knowledge, w)) / norm
             knowledge.pop()
-        if word in possible:
-            candidate_score /= 1.2  # a slight preference of possible words
+            if candidate_score > score:
+                break
         if candidate_score < score:
             prop = word
             score = candidate_score
