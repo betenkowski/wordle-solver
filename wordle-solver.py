@@ -88,7 +88,7 @@ def propose(words, knowledge):
             candidate_score += sum(1 for w in possible if is_possible(knowledge, w))
             knowledge.pop()
         if word in possible:
-            candidate_score *= 1.2  # a slight preference of possible words
+            candidate_score /= 1.2  # a slight preference of possible words
         if candidate_score < score:
             prop = word
             score = candidate_score
