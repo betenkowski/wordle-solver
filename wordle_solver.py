@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from math import inf
 import random
 from enum import Enum
+from itertools import chain
 
 
 class Count(Enum):
@@ -33,6 +34,27 @@ class Knowledge:
                 return False
 
         return True
+
+    def merged_with(self, other):
+        present_on = self.present_on.copy()
+        absent_on = self.absent_on.copy()
+        counts = self.counts.copy()
+
+        for ch, pos in other.present_on:
+            present_on[ch] = present_on.get(ch, set()) | pos
+
+        for ch, pos in other.absent_on:
+            absent_on[ch] = absent_on.get(ch, set()) | pos
+
+        for ch, (t, cnt) in other.counts:
+            ct, ccnt = counts.get(ch, (Count.Min, 0))
+            if ct == Count.Min:
+                if t == Count.Exact:
+                    counts[ch] = (Count.Exact, cnt)
+                else:
+                    counts[ch] = (Count.Min, max(cnt, ccnt))
+
+        Knowledge(present_on, absent_on, counts)
 
     @staticmethod
     def build_for_words(word, solution):
