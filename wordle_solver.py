@@ -114,12 +114,12 @@ def propose(words, knowledge):
     max_complexity = 16875000 * 2
     effective_pos = min(pos_count, max_possible)
 
+    candidates = words
     if len(words) * pos_count * pos_count > max_complexity:
         cnt = int(max_complexity / (effective_pos * effective_pos))
-        print(f'Sampling {cnt} words')
-        candidates = random.sample(words, cnt)
-    else:
-        candidates = words
+        if cnt < len(words):
+            print(f'Sampling {cnt} words')
+            candidates = random.sample(words, cnt)
 
     solution_found_on = 5
     if pos_count < solution_found_on:
