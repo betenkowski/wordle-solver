@@ -2,6 +2,81 @@ import argparse
 from dataclasses import dataclass
 from math import inf
 import random
+from enum import Enum
+
+
+class Count(Enum):
+    Min = 1
+    Exact = 2
+
+
+@dataclass
+class Knowledge:
+    present_on: dict
+    absent_on: dict
+    counts: dict  # character → (Min|Exact, count)
+
+    def is_possible(self, word):
+        for ch, positions in self.present_on.items():
+            if any(word[position] != ch for position in positions):
+                return False
+
+        for ch, positions in self.absent_on.items():
+            if any(word[position] == ch for position in positions):
+                return False
+
+        for ch, (t, count) in self.counts.items():
+            cnt = word.count(ch)
+            if t == Count.Min and cnt < count:
+                return False
+            elif t == Count.Exact and cnt != count:
+                return False
+
+        return True
+
+    @staticmethod
+    def build_for_words(word, solution):
+        present_on = {}
+        absent_on = {}
+        counts = {}
+
+        for i, (wch, sch) in enumerate(zip(word, solution)):
+            if wch == sch:
+                add_to_set(present_on, wch, i)
+            else:
+                add_to_set(absent_on, wch, i)
+
+        for wch in word:
+            if wch in counts:
+                continue
+            word_count = word.count(wch)
+            solution_count = solution.count(wch)
+            counts[wch] = (Count.Exact if word_count > solution_count else Count.Min, min(word_count, solution_count))
+
+        return Knowledge(present_on, absent_on, counts)
+
+    @staticmethod
+    def build_for_feedback(word, feedback):
+        present_on = {}
+        absent_on = {}
+        counts = {}
+        grays = set()
+
+        for i, (wch, fch) in enumerate(zip(word, feedback)):
+            if fch == '!':
+                add_to_set(present_on, wch, i)
+                add_one(counts, wch)
+            elif fch == '?':
+                add_to_set(absent_on, wch, i)
+                add_one(counts, wch)
+            elif fch == '.':
+                add_to_set(absent_on, wch, i)
+                counts.setdefault(wch, 0)
+                grays.add(wch)
+
+        counts = {ch: (Count.Exact if ch in grays else Count.Min, cnt) for ch, cnt in counts.items()}
+
+        return Knowledge(present_on, absent_on, counts)
 
 
 @dataclass
