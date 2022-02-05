@@ -72,16 +72,27 @@ def propose(words, knowledge):
     possible = list(filter(lambda w: is_possible(knowledge, w), words))
     pos_count = len(possible)
     print(f'{pos_count} possible words found')
-    max_possible = 100
+
+    max_possible = 75
+    max_complexity = 16875000
+    effective_pos = min(pos_count, max_possible)
+
+    if len(words) * pos_count * pos_count > max_complexity:
+        cnt = int(max_complexity / (effective_pos * effective_pos))
+        print(f'Sampling {cnt} words')
+        candidates = random.sample(words, cnt)
+    else:
+        candidates = words
+
     solution_found_on = 5
     if pos_count < solution_found_on:
         print(f"Solutions found: {possible}")
     if pos_count > max_possible:
-        print(f'Sampling {max_possible} words')
+        print(f'Sampling {max_possible} possible words')
         possible = random.sample(possible, max_possible)
     score = inf
     prop = ''
-    for word in words:
+    for word in candidates:
         candidate_score = 0
         for solution in possible:
             knowledge.append(report_for_words(word, solution))
@@ -101,12 +112,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     with open(f'dictionaries/{args.dictionary}.txt', 'r') as f:
-        words = f.read().splitlines()
+        words = list(filter(lambda w: len(w) == 5, f.read().splitlines()))
 
     knowledge = []
     while True:
         proposal = propose(words, knowledge)
         feedback = input(f'Proposal: {proposal}, feedback: ')
-        if feedback == 'end':
+        if feedback == 'end' or feedback == '!!!!!':
             break
         knowledge.append(report_for_feedback(proposal, feedback))
