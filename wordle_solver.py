@@ -1,9 +1,8 @@
 import argparse
-from dataclasses import dataclass
-from math import inf
 import random
+from dataclasses import dataclass
 from enum import Enum
-from itertools import chain
+from math import inf
 
 
 class Count(Enum):
@@ -40,13 +39,13 @@ class Knowledge:
         absent_on = self.absent_on.copy()
         counts = self.counts.copy()
 
-        for ch, pos in other.present_on:
+        for ch, pos in other.present_on.items():
             present_on[ch] = present_on.get(ch, set()) | pos
 
-        for ch, pos in other.absent_on:
+        for ch, pos in other.absent_on.items():
             absent_on[ch] = absent_on.get(ch, set()) | pos
 
-        for ch, (t, cnt) in other.counts:
+        for ch, (t, cnt) in other.counts.items():
             ct, ccnt = counts.get(ch, (Count.Min, 0))
             if ct == Count.Min:
                 if t == Count.Exact:
@@ -54,7 +53,7 @@ class Knowledge:
                 else:
                     counts[ch] = (Count.Min, max(cnt, ccnt))
 
-        Knowledge(present_on, absent_on, counts)
+        return Knowledge(present_on, absent_on, counts)
 
     @staticmethod
     def build_for_words(word, solution):
@@ -100,58 +99,9 @@ class Knowledge:
 
         return Knowledge(present_on, absent_on, counts)
 
-
-@dataclass
-class Report:
-    absent: dict
-    exact: dict
-    present_not_on: dict
-
-    def __post_init__(self):
-        self.cache = {}
-
-
-def is_possible_single(report, word):
-    if word in report.cache:
-        return report.cache[word]
-
-    def impl():
-        for ch, positions in report.absent.items():
-            e = report.exact.get(ch, set())
-            p = report.present_not_on.get(ch, set())
-            if not e and not p:
-                if ch in word:
-                    return False
-            else:
-                if word.count(ch) != len(e) + len(p):
-                    return False
-                if any(word[i] == ch for i in positions):
-                    return False
-
-        for ch, positions in report.exact.items():
-            if any(word[pos] != ch for pos in positions):
-                return False
-
-        for ch, positions in report.present_not_on.items():
-            found = False
-            for i, wch in enumerate(word):
-                if wch == ch and i not in positions:
-                    found = True
-            if not found:
-                return False
-
-        return True
-
-    ret = impl()
-    report.cache[word] = ret
-    return ret
-
-
-def is_possible(kb, word):
-    for report in kb:
-        if not is_possible_single(report, word):
-            return False
-    return True
+    @staticmethod
+    def empty():
+        return Knowledge({}, {}, {})
 
 
 def add_to_set(d, key, value):
@@ -164,46 +114,8 @@ def add_one(d, key):
     d[key] = value + 1
 
 
-def report_for_words(word, solution):
-    absent = {}
-    exact = {}
-    present_not_on = {}
-    analyzed = {}
-    for i, (wch, sch) in enumerate(zip(word, solution)):
-        if wch == sch:
-            add_to_set(exact, wch, i)
-            add_one(analyzed, wch)
-
-    for i, (wch, sch) in enumerate(zip(word, solution)):
-        if wch != sch:
-            if wch in solution \
-                    and i not in exact.get(wch, set()) \
-                    and analyzed.get(wch, 0) < solution.count(wch):
-                add_to_set(present_not_on, wch, i)
-                add_one(analyzed, wch)
-            else:
-                add_to_set(absent, wch, i)
-
-    return Report(absent, exact, present_not_on)
-
-
-def report_for_feedback(word, feedback):
-    absent = {}
-    exact = {}
-    present_not_on = {}
-    for i, (wch, fch) in enumerate(zip(word, feedback)):
-        if fch == '.':
-            add_to_set(absent, wch, i)
-        elif fch == '!':
-            add_to_set(exact, wch, i)
-        elif fch == '?':
-            add_to_set(present_not_on, wch, i)
-
-    return Report(absent, exact, present_not_on)
-
-
 def propose(words, knowledge):
-    possible = list(filter(lambda w: is_possible(knowledge, w), words))
+    possible = list(filter(knowledge.is_possible, words))
     pos_count = len(possible)
     print(f'{pos_count} possible words found')
 
@@ -228,11 +140,10 @@ def propose(words, knowledge):
     prop = ''
     for word in candidates:
         candidate_score = 0
-        norm = 1.2 if is_possible(knowledge, word) else 1  # a slight preference of possible words
+        norm = 1.2 if knowledge.is_possible(word) else 1  # a slight preference of possible words
         for solution in possible:
-            knowledge.append(report_for_words(word, solution))
-            candidate_score += sum(1 for w in possible if is_possible(knowledge, w)) / norm
-            knowledge.pop()
+            updated_kb = knowledge.merged_with(Knowledge.build_for_words(word, solution))
+            candidate_score += sum(1 for w in possible if updated_kb.is_possible(w)) / norm
             if candidate_score > score:
                 break
         if candidate_score < score:
@@ -249,10 +160,10 @@ if __name__ == '__main__':
     with open(f'dictionaries/{args.dictionary}.txt', 'r') as f:
         words = list(filter(lambda w: len(w) == 5, f.read().splitlines()))
 
-    knowledge = []
+    knowledge = Knowledge.empty()
     while True:
         proposal = propose(words, knowledge)
         feedback = input(f'Proposal: {proposal}, feedback: ')
         if feedback == 'end' or feedback == '!!!!!':
             break
-        knowledge.append(report_for_feedback(proposal, feedback))
+        knowledge = knowledge.merged_with(Knowledge.build_for_feedback(proposal, feedback))
